@@ -31,8 +31,35 @@ app.post('/api/generate', async (req,res)=>{
   if(text.trim().length<180) return res.status(422).json({error:'Not enough readable text in this batch to create reliable questions.'});
   const n=Math.max(1,Math.min(8,Number(count)||5));
   const prompt=`Source PDF: ${String(source||'Uploaded PDF').slice(0,160)}\nUPSC subject context: ${String(subject).slice(0,100)}\nQuestion style: ${style}. Difficulty: ${difficulty}. Target count: ${n}.\nCreate up to ${n} non-repetitive, high-quality UPSC Prelims MCQs from this source batch. Prefer statement-based and conceptual questions. Only produce questions that can be answered from the provided text. sourcePage must exactly match one of the page numbers below. sourceEvidence must be a short verbatim excerpt from that same page.\n\nSOURCE TEXT:\n${text}`;
-  const upstream=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':GEMINI_API_KEY},body:JSON.stringify({systemInstruction:{parts:[{text:systemPrompt}]},contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{temperature:0.25,topP:0.85,maxOutputTokens:7000,responseMimeType:'application/json',responseSchema:schema}})});
-  const payload=await upstream.json();
+  
+   let upstream;
+   let payload;
+   for (let attempt = 0; attempt < 4; attempt++) {
+     upstream = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`, {
+       method: 'POST',
+       headers: {
+         'Content-Type': 'application/json',
+         'x-goog-api-key': GEMINI_API_KEY
+       },
+       body: JSON.stringify({
+         systemInstruction: { parts: [{ text: systemPrompt }] },
+         contents: [{ role: 'user', parts: [{ text: prompt }] }],
+         generationConfig: {
+           temperature: 0.25,
+           topP: 0.85,
+           maxOutputTokens: 7000,
+           responseMimeType: 'application/json',
+           responseSchema: schema
+         }
+       })
+     });
+     payload = await upstream.json();
+     if (upstream.ok || ![429, 500, 502, 503, 504].includes(upstream.status) || attempt === 3) break;
+     const waitMs = 2000 * (2 ** attempt);
+     console.log(`Gemini temporarily unavailable. Retrying in ${waitMs / 1000}s...`);
+     await new Promise(resolve => setTimeout(resolve, waitMs));
+   }
+
   if(!upstream.ok){const msg=payload?.error?.message||`Gemini request failed (${upstream.status})`;return res.status(502).json({error:msg.slice(0,500)});}
   const raw=payload?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'';
   let parsed;try{parsed=JSON.parse(raw)}catch{return res.status(502).json({error:'Gemini returned malformed structured output. Please retry this batch.'});}

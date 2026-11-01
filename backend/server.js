@@ -14,7 +14,7 @@ const allowed = (process.env.ALLOWED_ORIGINS || '*').split(',').map(x => x.trim(
 if (!GEMINI_API_KEY) console.error('Missing GEMINI_API_KEY environment secret');
 if (!APP_ACCESS_TOKEN) console.error('Missing APP_ACCESS_TOKEN environment secret');
 app.disable('x-powered-by');
-app.use(cors({origin(origin, cb) { if (!origin || allowed.includes('*') || allowed.includes(origin)) return cb(null, true); return cb(new Error('Origin not allowed')); }, methods:['GET','POST'], allowedHeaders:['Content-Type','x-pq-token','x-pq-admin']
+app.use(cors({origin(origin, cb) { if (!origin || allowed.includes('*') || allowed.includes(origin)) return cb(null, true); return cb(new Error('Origin not allowed')); }, methods:['GET','POST'], allowedHeaders:['Content-Type','x-pq-token','x-pq-admin']}));
 app.use(express.json({limit:'180kb'}));
 app.use(rateLimit({windowMs:60_000,limit:12,standardHeaders:true,legacyHeaders:false}));
 app.use((req,res,next)=>{ if(req.path==='/api/health') return next(); const supplied=req.get('x-pq-token')||''; if(!APP_ACCESS_TOKEN || supplied.length!==APP_ACCESS_TOKEN.length || supplied!==APP_ACCESS_TOKEN) return res.status(401).json({error:'Unauthorised. Check the backend access token in PDF Quest Admin.'}); next(); });

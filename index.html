@@ -23,7 +23,16 @@
 <section class="card"><div class="between"><h3 style="margin:0">Your study library</h3><span class="pill" id="libraryCount">0 files</span></div><div id="libraryList" class="muted">No PDFs yet. Open Admin to upload your study PDFs.</div></section>
 </main>
 <main id="adminView" class="hidden">
-<section class="card adminLock" id="lockPanel"><h2>Admin access</h2><p class="muted">Set a local admin PIN on first use. This PIN protects the admin screen on this browser only.</p><div class="field"><label for="adminPin">Admin PIN</label><input id="adminPin" type="password" inputmode="numeric" placeholder="Enter or create PIN"></div><button onclick="unlockAdmin()" id="unlockBtn">Continue</button><p class="small" id="lockHint"></p></section>
+  <section class="card adminLock" id="lockPanel">
+  <h2>Admin login</h2>
+  <p class="muted">Private access for the website owner.</p>
+  <div class="field">
+    <label for="adminPin">Admin password</label>
+    <input id="adminPin" type="password" placeholder="Enter your private password">
+  </div>
+  <button onclick="unlockAdmin()" id="unlockBtn">Login</button>
+  <p class="small" id="lockHint"></p>
+  </section>
 <div id="adminPanel" class="hidden">
 <section class="card"><div class="between"><h2 style="margin:0">Admin dashboard</h2><button class="secondary" onclick="lockAdmin()">Lock panel</button></div><p class="muted">Manage source PDFs, generated questions and your question bank.</p><div class="grid"><div class="stat"><b id="adminQCount">0</b><span class="small">Total questions</span></div><div class="stat"><b id="adminPdfCount">0</b><span class="small">PDF documents</span></div><div class="stat"><b id="adminManualCount">0</b><span class="small">Manual questions</span></div></div></section>
 <section class="card"><h3>1. Connect UPSC AI & upload study PDFs</h3>
@@ -36,7 +45,7 @@
 <button onclick="uploadPdfs()" id="uploadBtn">Analyse PDFs & generate UPSC questions</button><div id="uploadStatus" class="notice hidden"></div><div id="adminPdfList"></div></section>
 <section class="card"><h3>2. Add a manual MCQ</h3><div class="field"><label>Question</label><textarea id="manualQuestion" placeholder="Type your question"></textarea></div><div class="grid"><div class="field"><label>Option A</label><input id="opt0"></div><div class="field"><label>Option B</label><input id="opt1"></div><div class="field"><label>Option C</label><input id="opt2"></div><div class="field"><label>Option D</label><input id="opt3"></div></div><div class="grid"><div class="field"><label>Correct option</label><select id="correctOpt"><option value="0">A</option><option value="1">B</option><option value="2">C</option><option value="3">D</option></select></div><div class="field"><label>Explanation (optional)</label><input id="manualExplanation" placeholder="Why is this correct?"></div></div><button onclick="addManualQuestion()">Add question to bank</button></section>
 <section class="card"><div class="between"><h3 style="margin:0">3. Question bank</h3><span class="pill" id="bankCount">0</span></div><div class="field"><input id="bankSearch" placeholder="Search questions..." oninput="renderBank()"></div><div id="bankList"></div><div id="editPanel" class="notice hidden"><h4>Edit question</h4><input id="editId" type="hidden"><div class="field"><label>Question</label><textarea id="editQuestion"></textarea></div><div class="grid"><div class="field"><label>Option A</label><input id="editOpt0"></div><div class="field"><label>Option B</label><input id="editOpt1"></div><div class="field"><label>Option C</label><input id="editOpt2"></div><div class="field"><label>Option D</label><input id="editOpt3"></div></div><div class="grid"><div class="field"><label>Correct option</label><select id="editCorrect"><option value="0">A</option><option value="1">B</option><option value="2">C</option><option value="3">D</option></select></div><div class="field"><label>Explanation</label><input id="editExplanation"></div></div><div class="row"><button onclick="saveEditedQuestion()">Save changes</button><button class="secondary" onclick="$('editPanel').classList.add('hidden')">Cancel</button></div></div></section>
-<section class="card"><h3>4. Backup & settings</h3><div class="row"><button class="secondary" onclick="exportBackup()">Export backup JSON</button><label class="secondary" style="padding:11px 15px;border-radius:12px;cursor:pointer">Import backup JSON<input type="file" id="backupInput" accept="application/json,.json" hidden onchange="importBackup(event)"></label></div><div class="field"><label>Change admin PIN</label><input id="newPin" type="password" inputmode="numeric" placeholder="New PIN (at least 4 characters)"></div><button class="secondary" onclick="changePin()">Update PIN</button><hr style="border:0;border-top:1px solid var(--line);margin:20px 0"><button class="danger" onclick="clearAllData()">Delete all local app data</button><p class="small">Data is stored only in this browser profile. Clearing browser site data or changing devices can remove it; export backups regularly.</p></section>
+<section class="card"><h3>4. Backup & settings</h3><div class="row"><button class="secondary" onclick="exportBackup()">Export backup JSON</button><label class="secondary" style="padding:11px 15px;border-radius:12px;cursor:pointer">Import backup JSON<input type="file" id="backupInput" accept="application/json,.json" hidden onchange="importBackup(event)"></label></div><hr style="border:0;border-top:1px solid var(--line);margin:20px 0"><button class="danger" onclick="clearAllData()">Delete all local app data</button><p class="small">Data is stored only in this browser profile. Clearing browser site data or changing devices can remove it; export backups regularly.</p></section>
 </div></main>
 <div class="footer">PDF QUEST · Local-first study tool · Installable when hosted over HTTPS</div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -61,7 +70,43 @@ function saveAISettings(){const url=$('aiBackendUrl').value.trim().replace(/\/$/
 async function testAIConnection(){const c=getAISettings();if(!c.url||!c.token){alert('Enter and save the backend URL and access token first.');return}try{const r=await fetch(c.url+'/api/health',{headers:{'x-pq-token':c.token}});const d=await r.json();if(!r.ok||!d.ok)throw Error(d.error||'Backend not ready');$('aiConnectionStatus').textContent='Connected · '+(d.model||'Gemini backend')}catch(e){$('aiConnectionStatus').textContent='Connection failed: '+e.message}}
 function chunkPages(pages,maxChars=11500){const chunks=[];let current=[],size=0;for(const p of pages){const t=(p.text||'').trim();if(!t)continue;if(size+t.length>maxChars&&current.length){chunks.push(current);current=[];size=0}current.push({page:p.page,text:t.slice(0,maxChars)});size+=t.length;if(size>=maxChars){chunks.push(current);current=[];size=0}}if(current.length)chunks.push(current);return chunks}
 async function extractPdfPages(file){if(!window.pdfjsLib)throw Error('PDF reader did not load. Reload while connected to the internet.');const bytes=await file.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:bytes.slice(0)}).promise;const pages=[];let combined='';for(let p=1;p<=pdf.numPages;p++){const page=await pdf.getPage(p);const content=await page.getTextContent();let text=content.items.map(x=>x.str).join(' ').replace(/\s+/g,' ').trim();if(text.length<25&&window.Tesseract){const viewport=page.getViewport({scale:1.7});const canvas=document.createElement('canvas');canvas.width=viewport.width;canvas.height=viewport.height;await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;const ocr=await Tesseract.recognize(canvas,'eng');text=ocr.data.text.replace(/\s+/g,' ').trim();canvas.width=canvas.height=1}pages.push({page:p,text});combined+='\n[Page '+p+'] '+text}return {bytes,pages,numPages:pdf.numPages,rawText:combined}}
-async function generateFromChunk(chunk,meta){const c=getAISettings();if(!c.url||!c.token)throw Error('Configure and test the Gemini backend connection before importing PDFs.');const res=await fetch(c.url+'/api/generate',{method:'POST',headers:{'Content-Type':'application/json','x-pq-token':c.token},body:JSON.stringify({pages:chunk,source:meta.name,subject:meta.subject||'UPSC General Studies',style:$('aiStyle').value,difficulty:$('aiDifficulty').value,count:Number($('aiCount').value)})});let data;try{data=await res.json()}catch{throw Error('Backend returned an invalid response.')}if(!res.ok)throw Error(data.error||'AI generation failed ('+res.status+')');return data.questions||[]}
+async function generateFromChunk(chunk,meta){
+  const c=getAISettings();
+
+  if(!c.url||!c.token) {
+    throw Error('Configure and test the Gemini backend connection before importing PDFs.');
+  }
+
+  const res=await fetch(c.url+'/api/generate',{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'x-pq-token':c.token,
+      'x-pq-admin':sessionStorage.getItem('pq_admin_session')||''
+    },
+    body:JSON.stringify({
+      pages:chunk,
+      source:meta.name,
+      subject:meta.subject||'UPSC General Studies',
+      style:$('aiStyle').value,
+      difficulty:$('aiDifficulty').value,
+      count:Number($('aiCount').value)
+    })
+  });
+
+  let data;
+  try {
+    data=await res.json();
+  } catch {
+    throw Error('Backend returned an invalid response.');
+  }
+
+  if(!res.ok) {
+    throw Error(data.error||'AI generation failed ('+res.status+')');
+  }
+
+  return data.questions||[];
+  }
 async function importPdfFile(file,onProgress){const extracted=await extractPdfPages(file);const chunks=chunkPages(extracted.pages);if(!chunks.length)throw Error('No readable text found. This may be a scanned PDF; ensure OCR loads and try again.');const id=crypto.randomUUID();let generated=[];for(let i=0;i<chunks.length;i++){onProgress?.(`AI analysing ${file.name}: source batch ${i+1}/${chunks.length}…`);const qs=await generateFromChunk(chunks[i],{name:file.name});for(const q of qs){if(!q.question||!Array.isArray(q.options)||q.options.length!==4||!Number.isInteger(q.answer)||q.answer<0||q.answer>3)continue;const duplicate=generated.some(x=>x.question.toLowerCase().replace(/\W/g,'')===q.question.toLowerCase().replace(/\W/g,''));if(duplicate)continue;generated.push({id:crypto.randomUUID(),type:'gemini',source:file.name,pdfId:id,question:q.question,options:q.options,answer:q.answer,explanation:q.explanation||'',topic:q.topic||'General Studies',difficulty:q.difficulty||'moderate',questionType:q.questionType||'conceptual',sourcePage:q.sourcePage||null,sourceEvidence:q.sourceEvidence||'',createdAt:Date.now()})}}if(!generated.length)throw Error('Gemini returned no valid source-grounded MCQs. Try a text-based PDF or a smaller batch.');await put('pdfs',{id,name:file.name,pages:extracted.numPages,bytes:extracted.bytes.byteLength,createdAt:Date.now(),sentenceCount:extracted.pages.length,questionCount:generated.length,rawText:extracted.rawText.slice(0,200000),pdfData:extracted.bytes.slice(0)});for(const q of generated)await put('questions',q);return {pages:extracted.numPages,generated:generated.length,id}}
 async function uploadPdfs(){const files=[...$('pdfInput').files];if(!files.length){alert('Choose at least one PDF first.');return}const status=$('uploadStatus');status.classList.remove('hidden');status.className='notice';status.textContent='Preparing source PDFs…';$('uploadBtn').disabled=true;let summary=[];try{for(const f of files){if(f.type!=='application/pdf'&&!f.name.toLowerCase().endsWith('.pdf'))continue;const r=await importPdfFile(f,msg=>status.textContent=msg);summary.push(`${f.name}: ${r.pages} pages · ${r.generated} UPSC MCQs generated`)}await loadData();refreshHome();renderAdmin();status.className='notice good';status.textContent=summary.length?summary.join(' | '):'No valid PDF files selected.';}catch(e){status.className='notice warn';status.textContent='Import error: '+e.message;}finally{$('uploadBtn').disabled=false;$('pdfInput').value=''}}
 function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]}return b}
@@ -73,9 +118,52 @@ async function nextQuestion(){if(answers[current]===undefined)return;current++;i
 function finishQuiz(){const review=session.map((q,i)=>({q,chosen:answers[i],correct:answers[i]===q.answer}));lastReview=review;const score=review.filter(x=>x.correct).length;const total=review.length;localStorage.setItem('pq_total',String(Number(localStorage.getItem('pq_total')||0)+total));localStorage.setItem('pq_correct',String(Number(localStorage.getItem('pq_correct')||0)+score));$('quiz').classList.add('hidden');$('results').classList.remove('hidden');$('resultScore').textContent=score+'/'+total;$('resultPercent').textContent=Math.round(score/total*100)+'%';$('resultMessage').textContent=score===total?'Perfect session. Excellent work!':score/total>=.7?'Good progress. Review the missed questions and keep going.':'Keep practising. Revisit the source PDF and try another random set.';refreshHome()}
 function showReview(){$('review').classList.remove('hidden');$('review').innerHTML=lastReview.map((r,i)=>`<div class="listitem"><b>${i+1}. ${esc(r.q.question)}</b><p class="small">Your answer: ${r.chosen===undefined?'Not answered':esc(r.q.options[r.chosen])} · ${r.correct?'Correct':'Incorrect'}</p><p class="small">Correct: ${esc(r.q.options[r.q.answer])}</p><p class="small">${esc(r.q.explanation||'')}</p><p class="small">${r.q.sourcePage?'Source: '+esc(r.q.source)+' · PDF page '+r.q.sourcePage:''}</p></div>`).join('')}
 function quitQuiz(){if(confirm('Exit this session? Your incomplete session will not count.')){$('quiz').classList.add('hidden');$('home').classList.remove('hidden');$('setup').classList.remove('hidden')}}
-async function updateLockText(){const pin=await setting('adminPin');$('lockHint').textContent=pin?'Enter your admin PIN.':'First time? Create a PIN (minimum 4 characters).';$('unlockBtn').textContent=pin?'Unlock admin':'Create admin PIN'}
-async function unlockAdmin(){const v=$('adminPin').value.trim();if(v.length<4){alert('PIN must be at least 4 characters.');return}const old=await setting('adminPin');if(old&&old!==v){$('lockHint').textContent='Incorrect PIN. Try again.';return}if(!old)await setSetting('adminPin',v);adminUnlocked=true;$('lockPanel').classList.add('hidden');$('adminPanel').classList.remove('hidden');$('adminPin').value='';renderAdmin()}
-function lockAdmin(){adminUnlocked=false;$('adminPanel').classList.add('hidden');$('lockPanel').classList.remove('hidden');updateLockText()}
+  async function updateLockText(){
+  $('lockHint').textContent='Enter your private Admin password.';
+  $('unlockBtn').textContent='Login';
+}
+
+async function unlockAdmin(){
+  const password=$('adminPin').value;
+  if(!password){alert('Enter your Admin password.');return;}
+
+  const config=await getAISettings();
+  if(!config.url||!config.token){
+    alert('Configure the backend URL and app access token first.');
+    return;
+  }
+
+  try{
+    const response=await fetch(config.url+'/api/admin/login',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-pq-token':config.token
+      },
+      body:JSON.stringify({password})
+    });
+
+    const data=await response.json();
+    if(!response.ok)throw new Error(data.error||'Login failed.');
+
+    sessionStorage.setItem('pq_admin_session',data.token);
+    adminUnlocked=true;
+    $('lockPanel').classList.add('hidden');
+    $('adminPanel').classList.remove('hidden');
+    $('adminPin').value='';
+    await renderAdmin();
+  }catch(error){
+    alert(error.message||'Admin login failed.');
+  }
+}
+
+function lockAdmin(){
+  adminUnlocked=false;
+  sessionStorage.removeItem('pq_admin_session');
+  $('adminPanel').classList.add('hidden');
+  $('lockPanel').classList.remove('hidden');
+  updateLockText();
+}
 async function addManualQuestion(){const question=$('manualQuestion').value.trim(),opts=[0,1,2,3].map(i=>$('opt'+i).value.trim()),answer=Number($('correctOpt').value);if(!question||opts.some(x=>!x)||new Set(opts.map(x=>x.toLowerCase())).size!==4){alert('Enter a question and four different non-empty options.');return}await put('questions',{id:crypto.randomUUID(),type:'manual',source:'Manual',pdfId:null,question,options:opts,answer,explanation:$('manualExplanation').value.trim(),createdAt:Date.now()});for(const id of ['manualQuestion','opt0','opt1','opt2','opt3','manualExplanation'])$(id).value='';await loadData();renderAdmin();refreshHome();alert('Question added.')}
 async function renderAdmin(){if(!adminUnlocked)return;await loadData();$('aiBackendUrl').value=localStorage.getItem('pq_ai_url')||'';$('aiAccessToken').value=localStorage.getItem('pq_ai_token')||'';$('adminQCount').textContent=questions.length;$('adminPdfCount').textContent=pdfs.length;$('adminManualCount').textContent=questions.filter(q=>q.type==='manual').length;$('bankCount').textContent=questions.length+' questions';$('adminPdfList').innerHTML=pdfs.map(p=>`<div class="listitem between"><div><b>${esc(p.name)}</b><div class="small">${p.pages} pages · ${p.questionCount} questions</div></div><button class="danger" onclick="deletePdf('${p.id}')">Remove PDF</button></div>`).join('');renderBank()}
 function renderBank(){if(!adminUnlocked)return;const term=$('bankSearch').value.toLowerCase();const list=questions.filter(q=>q.question.toLowerCase().includes(term)||String(q.source).toLowerCase().includes(term)).slice(0,100);$('bankList').innerHTML=list.length?list.map(q=>`<div class="listitem"><div class="between"><span class="pill">${q.type==='manual'?'MANUAL':'PDF GENERATED'}</span><div class="row"><button class="secondary" onclick="editQuestion('${q.id}')">Edit</button><button class="danger" onclick="deleteQuestion('${q.id}')">Delete</button></div></div><b>${esc(q.question)}</b><div class="small">${esc(q.source)} · ${esc(q.topic||'')} · ${q.sourcePage?'p. '+q.sourcePage+' · ':''}Answer: ${esc(q.options[q.answer])}</div></div>`).join(''):'No matching questions.'}
@@ -83,7 +171,6 @@ function editQuestion(id){const q=questions.find(x=>x.id===id);if(!q)return;$('e
 async function saveEditedQuestion(){const id=$('editId').value,q=questions.find(x=>x.id===id);if(!q)return;const question=$('editQuestion').value.trim(),options=[0,1,2,3].map(i=>$('editOpt'+i).value.trim());if(!question||options.some(x=>!x)||new Set(options.map(x=>x.toLowerCase())).size!==4){alert('Enter a question and four different non-empty options.');return}q.question=question;q.options=options;q.answer=Number($('editCorrect').value);q.explanation=$('editExplanation').value.trim();await put('questions',q);await loadData();$('editPanel').classList.add('hidden');renderAdmin();refreshHome()}
 async function deleteQuestion(id){if(!confirm('Delete this question?'))return;await del('questions',id);await loadData();renderAdmin();refreshHome()}
 async function deletePdf(id){if(!confirm('Remove this PDF and all questions generated from it?'))return;for(const q of questions.filter(x=>x.pdfId===id))await del('questions',q.id);await del('pdfs',id);await loadData();renderAdmin();refreshHome()}
-async function changePin(){const p=$('newPin').value.trim();if(p.length<4){alert('New PIN must be at least 4 characters.');return}await setSetting('adminPin',p);$('newPin').value='';alert('Admin PIN updated for this browser.')}
 async function exportBackup(){await loadData();const data={app:'PDF Quest',version:1,exportedAt:new Date().toISOString(),questions,pdfs:pdfs.map(({rawText,pdfData,...p})=>p),stats:{total:localStorage.getItem('pq_total')||'0',correct:localStorage.getItem('pq_correct')||'0'}};const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});downloadBlob(blob,'pdf-quest-backup-'+new Date().toISOString().slice(0,10)+'.json')}
 function downloadBlob(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500)}
 async function importBackup(ev){const f=ev.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());if(!Array.isArray(d.questions)||!Array.isArray(d.pdfs))throw Error('Invalid backup file');for(const q of d.questions){if(q.id&&q.question&&Array.isArray(q.options)&&q.options.length===4)await put('questions',q)}for(const p of d.pdfs){if(p.id&&p.name)await put('pdfs',p)}if(d.stats){localStorage.setItem('pq_total',d.stats.total||'0');localStorage.setItem('pq_correct',d.stats.correct||'0')}await loadData();renderAdmin();refreshHome();alert('Backup imported.')}catch(e){alert('Could not import backup: '+e.message)}finally{ev.target.value=''}}
